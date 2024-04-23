@@ -1,0 +1,827 @@
+---
+title: "Data Visualization Dashboard"
+logo: assets/city-of-norfolk.png
+format: dashboard
+
+theme: 
+  - cosmo
+  - assets/styles/custom.scss
+  - assets/styles/quarto.scss
+
+execute: 
+  echo: false
+---
+
+```{r setup, include = FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(haven)
+library(readr)
+library(tidyr)
+library(RColorBrewer)
+library(patchwork)
+library(shiny)
+```
+
+```{r data}
+datels <- haven::read_sav("/Users/nelliechen/Desktop/IDA/Data-Visualization/ELS variable undated 2.13.21.sav")
+els <- datels
+els <- els %>%
+rename(stu_id = STU_ID, # change column names
+    sch_id = SCH_ID,
+    excellentTests = BYS89A,  
+    understandTexts = BYS89B,  
+    understandClass = BYS89L,  
+    excellentAssign = BYS89R,  
+    masterSkills = BYS89U,   
+    els_cohort_g10 = G10COHRT,  
+    els_cohort_g12 = G12COHRT)
+# new variable with coding matching that in HSLS
+els$sex <- els$Male
+els$sex[els$sex==0] <- 2
+# no package available 
+#els$sex <- remove_labels(els$sex, labels = get_labels(els$sex))
+attr(els$sex, "labels") <- NULL
+els$sample <- "ELS"
+
+dathsls <- haven::read_sav("/Users/nelliechen/Desktop/IDA/Data-Visualization/HSLS 2009 6.11.21.sav")
+hsls <- dathsls
+hsls <- hsls %>%
+	rename(stu_id = STU_ID, # change column names
+       	sch_id = SCH_ID,
+       	excellentTests = S1MTESTS,
+       	understandTexts = S1MTEXTBOOK,
+       	masterSkills = S1MSKILLS,
+       	excellentAssign = S1MASSEXCL,
+       	sex = X1SEX,
+       	race = X1RACE,
+       	Hispanic = X1HISPANIC,
+       	White = X1WHITE,
+       	Black = X1BLACK,
+       	Asian = X1ASIAN,
+       	PacificIsland = X1PACISLE,
+       	SES = X1SES,
+       	hsls_w_cohort_g9 = W1STUDENT,
+       	hsls_w_cohort_g12 = W2STUDENT)
+
+#hsls$sex <- remove_labels(hsls$sex, labels = get_labels(hsls$sex))
+attr(hsls$sex, "labels") <- NULL
+hsls$sample <- "HSLS"
+
+math_items <- c("excellentTests", "understandTexts", "understandClass",
+            	"excellentAssign", "masterSkills")
+
+els$stu_id <- as.character(els$stu_id)
+els$sch_id <- as.character(els$sch_id)
+hsls$stu_id <- as.character(hsls$stu_id)
+hsls$sch_id <- as.character(hsls$sch_id)
+
+# convert the math items to numeric to remove attributes and labels
+els[,math_items] <- apply(els[,math_items], MARGIN = 2, as.numeric)
+hsls[,math_items[-3]] <- apply(hsls[,math_items[-3]], MARGIN = 2, as.numeric)
+
+dat <- dplyr::full_join(els, hsls)
+
+dat <- dat %>% select(stu_id, sch_id, sample, all_of(math_items), Asian, Black,Hispanic, Public, everything())
+dat$sex <- as.character(dat$sex)
+```
+
+
+# ELS.1
+## Row {height=50%}
+### Column 
+
+```{r bar_excellent_test} 
+#| title: Excellent Test
+# Bar graph: excellent test 
+els <- els[!is.na(els$excellentTests), ] # data cleaning
+# Calculate mean and median
+mean_value <- mean(els$excellentTests, na.rm = TRUE)
+median_value <- median(els$excellentTests, na.rm = TRUE)
+
+# Create the bar graph
+els_excellent_test<-ggplot(els, aes(x = as.factor(excellentTests))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Excellent Test Scores", 
+       x = "Excellent Test Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") + # Add count labels
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_value, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") + # Add mean label
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_value), hjust = 1.1, vjust = 1, size = 4, color = "black") # Add median label
+```
+
+```{r bar_understand_text} 
+#| title: Understand Text
+# Bar graph: understandTexts
+
+els <- els[!is.na(els$understandTexts), ] # data cleaning
+# Calculate mean and median for understandTexts
+mean_understandTexts <- mean(els$understandTexts, na.rm = TRUE)
+median_understandTexts <- median(els$understandTexts, na.rm = TRUE)
+
+els_understand_text<-ggplot(els, aes(x = as.factor(understandTexts))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Understanding Texts Scores", 
+       x = "Understanding Texts Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_understandTexts, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_understandTexts), hjust = 1.1, vjust = 1, size = 4, color = "black")
+```
+
+```{r bar_understand_class}
+#| title: Understand Class
+# Bar graph: understandClass
+els <- els[!is.na(els$understandClass), ] # data cleaning
+# Calculate mean and median for understandClass
+mean_understandClass <- mean(els$understandClass, na.rm = TRUE)
+median_understandClass <- median(els$understandClass, na.rm = TRUE)
+
+els_understand_class<-ggplot(els, aes(x = as.factor(understandClass))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph of Understanding Class Material Scores", 
+       x = "Understanding Class Material Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_understandClass, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_understandClass), hjust = 1.1, vjust = 1, size = 4, color = "black")
+```
+
+```{r bar_excellent_assignment}
+#| title: Excellent Assignment
+# Bar graph: excellentAssign
+els <- els[!is.na(els$excellentAssign), ] # data cleaning
+# Calculate mean and median for excellentAssign
+mean_excellentAssign <- mean(els$excellentAssign, na.rm = TRUE)
+median_excellentAssign <- median(els$excellentAssign, na.rm = TRUE)
+
+els_excellent_assignment<-ggplot(els, aes(x = as.factor(excellentAssign))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Excellent Assignment Scores", 
+       x = "Excellent Assignment Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_excellentAssign, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_excellentAssign), hjust = 1.1, vjust = 1, size = 4, color = "black")
+```
+
+```{r bar_master_skills}
+#| title: Master Skills
+# Bar graph:  masterSkills
+els <- els[!is.na(els$masterSkills), ] # data cleaning
+# Calculate mean and median for masterSkills
+mean_masterSkills <- mean(els$masterSkills, na.rm = TRUE)
+median_masterSkills <- median(els$masterSkills, na.rm = TRUE)
+
+els_master_skills<-ggplot(els, aes(x = as.factor(masterSkills))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph of Mastering Skills Scores", 
+       x = "Mastering Skills Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_masterSkills, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_masterSkills), hjust = 1.1, vjust = 1, size = 4, color = "black")
+```
+
+```{r stacked_bar}
+#| title: Stacked Bar Graph
+els_long <- els %>%
+  pivot_longer(
+    cols = c(excellentTests, understandTexts, understandClass, excellentAssign, masterSkills),
+    names_to = "ScoreType",
+    values_to = "Scores"
+  )
+els_long_filtered <- els_long %>%
+  filter(!is.na(Scores)) # Removes rows where Scores is NA
+
+els_stacked_bar<-ggplot(els_long_filtered, aes(x = ScoreType, fill = as.factor(Scores))) + 
+  geom_bar(position = "stack") + 
+  geom_text(stat = 'count', aes(label = ..count..), position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = "Frequency of Scores by Score Type", 
+       x = "Score Type", 
+       y = "Frequency") +
+    scale_fill_brewer(palette = "Set4", labels = c("1" = "Almost Never(1)", "2" = "Sometimes(2)", "3" = "Often(3)", "4" = "Almost Always(4)")) +
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 6)) +
+    theme(axis.text.x = element_text(size = 4.5)) 
+```
+
+
+<iframe src="https://nellie02.shinyapps.io/elsbargraph-1/" width="100%" height="340"></iframe>
+
+### Column
+
+
+```{r eth distribution}
+#| title: Ethnicity Distribution
+# Calculate the total counts for each category
+category_counts <- els %>%
+  summarise(Asian = sum(Asian, na.rm = TRUE),
+            Black = sum(Black, na.rm = TRUE),
+            Hispanic = sum(Hispanic, na.rm = TRUE),
+            Other = sum(Other, na.rm = TRUE)) %>%
+  pivot_longer(cols = everything(), names_to = "Category", values_to = "Counts")
+
+# Calculate percentages
+total_counts <- sum(category_counts$Counts)
+category_counts <- category_counts %>%
+  mutate(Percentage = Counts / total_counts * 100)
+
+els_eth<-ggplot(category_counts, aes(x = "", y = Counts, fill = Category)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0) +
+  geom_text(aes(label = paste(Category, ": ", Counts, " (", sprintf("%.1f%%", Percentage), ")", sep = "")),
+            position = position_stack(vjust = 0.5),
+            size = 3) + 
+  labs(title = "Distribution of Ethnicity (ELS)", x = NULL, y = NULL, fill = "Category") +
+  scale_fill_brewer(palette = "Pastel1") +
+  theme_void() +
+  theme(legend.position = "none")
+print(els_eth)
+```
+
+
+## Row 
+### Column {.tabset width="70%"}
+
+
+```{r Grouped by Gender}
+#| title: Ratings Grouped by Gender
+els_long <- els %>%
+  pivot_longer(cols = c("excellentTests", "understandTexts", "understandClass", "excellentAssign", "masterSkills"), 
+               names_to = "Test", values_to = "Score") %>%
+  mutate(sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female"))) 
+
+colors_male <- brewer.pal(4, "Blues") 
+colors_female <- brewer.pal(4, "Reds")  
+els_long <- els_long %>%
+  mutate(ColorKey = interaction(sex, Score))
+color_values_els <- setNames(c(colors_male, colors_female), 
+                             levels(els_long$ColorKey))
+els_long_filtered <- els_long %>%
+  filter(!is.na(Score))
+
+ggplot(els_long_filtered, aes(x = Test, fill = ColorKey)) + 
+  geom_bar(position = position_dodge(width = 0.9), stat = "count") +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count", 
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    size = 2.5
+  ) +
+  scale_fill_manual(values = color_values_els, name = "Sex & Score") +
+  labs(
+    title = "Frequency of Scores by Test and Gender (ELS)",
+    x = "Test", y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r Grouped by Ethnicity}
+#| title: Ratings Grouped by Ethnicity
+els_long <- els %>%
+  pivot_longer(cols = c(Asian, Hispanic, Black, Other), names_to = "ethnicity", values_to = "belongs") %>%
+  filter(belongs == 1) %>%
+  select(-belongs) %>%
+  pivot_longer(cols = c(excellentTests, understandTexts, understandClass, excellentAssign, masterSkills),
+               names_to = "Test", values_to = "Score") %>%
+  mutate(Score = factor(Score))
+
+color_values_corrected <- setNames(c(
+  "#F2D7D5", "#E6B0AA", "#D98880", "#CD6155",  # Asian
+  "#EBDEF0", "#C39BD3", "#AF7AC5", "#884EA0",  # Hispanic
+  "#D6EAF8", "#AED6F1", "#85C1E9", "#5DADE2",  # Black
+  "#FEF5E7", "#FDEBD0", "#FAD7A0", "#F8C471"   # Other
+), c(
+  "Asian.1", "Asian.2", "Asian.3", "Asian.4",
+  "Hispanic.1", "Hispanic.2", "Hispanic.3", "Hispanic.4",
+  "Black.1", "Black.2", "Black.3", "Black.4",
+  "Other.1", "Other.2", "Other.3", "Other.4"
+))
+
+ggplot(els_long, aes(x = Test, fill = interaction(ethnicity, Score))) + 
+  geom_bar(stat = "count", position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = color_values_corrected) +
+  labs(title = "Frequency of Scores by Test and Ethnicity",
+       x = "Test", y = "Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+### Column {width = 30%}
+
+```{r gender distribution}
+#| title: Gender Distribution
+# Pie Chart
+els_summary <- els %>%
+  count(Male) %>%
+  mutate(Percentage = n / sum(n) * 100,
+         Label = paste0(round(Percentage, 1), "%"),
+         Male = factor(Male, labels = c("Female", "Male")))
+
+els_summary$Male <- factor(els_summary$Male, levels = c("Female", "Male"))
+els_gender<-ggplot(els_summary, aes(x = "", y = n, fill = Male)) + 
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = Label, y = cumsum(n) - 0.5 * n), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("Female" = "lightskyblue2", "Male" = "mintcream")) +
+  labs(title = "Gender Distribution (ELS)", x = NULL, y = NULL, fill = "Gender") +
+  theme_void()
+print(els_gender)
+```
+
+
+# ELS.2
+## Row {height=40%}
+### Column {.tabset width="70%"}
+
+```{r SES Group}
+#| title: SES Group
+ses_grp_counts <- table(els$SES_Grp)
+ses_grp_df <- as.data.frame(ses_grp_counts)
+colnames(ses_grp_df) <- c("SES_Group", "Count")
+
+ggplot(ses_grp_df, aes(x = SES_Group, y = Count, fill = SES_Group)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Distribution of SES Groups in ELS", x = "SES Group", y = "Count") +
+  theme_minimal() 
+```
+
+```{r SES and 1}
+#| title: SES Group and Excellent Test Scores
+els$excellentTests <- as.numeric(els$excellentTests)
+
+SES_ETS<-ggplot(els, aes(x = factor(SES_Grp), y = excellentTests, fill = factor(SES_Grp))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Excellent Test Scores by SES Group in ELS", x = "SES Group", y = "Excellent Test Scores") +
+  theme_minimal()
+
+SES_ETS <- SES_ETS + guides(fill = guide_legend(title = "SES Group"))
+```
+
+```{r SES and 2}
+#| title: SES Group and Master Skill Scores
+
+els$masterSkills <- as.numeric(els$masterSkills)
+
+ggplot(els, aes(x = factor(SES_Grp), y = masterSkills, fill = factor(SES_Grp))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Master Skills Scores by SES Group in ELS", x = "SES Group", y = "Master Skill Scores") +
+  theme_minimal() +
+  guides(fill = guide_legend(title = "SES Group"))
+
+```
+
+```{r SES and 3}
+#| title: SES Group and Understand Texts Scores
+els$understandTexts <- as.numeric(els$understandTexts)
+
+ggplot(els, aes(x = factor(SES_Grp), y = understandTexts, fill = factor(SES_Grp))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Understand Texts Scores by SES Group in ELS", x = "SES Group", y = "Understand Texts Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "SES Group"))
+```
+
+```{r SES and 4}
+#| title: SES Group and Understand Class Scores
+els$understandClass <- as.numeric(els$understandClass)
+
+ggplot(els, aes(x = factor(SES_Grp), y = understandClass, fill = factor(SES_Grp))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Understand Class Scores by SES Group in ELS", x = "SES Group", y = "Understand Class Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "SES Group"))
+```
+
+```{r SES and 5}
+#| title: SES Group and Excellent Assignment
+els$excellentAssign <- as.numeric(els$excellentAssign)
+
+ggplot(els, aes(x = factor(SES_Grp), y = excellentAssign, fill = factor(SES_Grp))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Excellent Assignment Scores by SES Group in ELS", x = "SES Group", y = "Excellent Assignment Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "SES Group"))
+```
+
+
+### Column {.tabset width="70%"}
+
+```{r first generation}
+#| title: First Generation
+els_filtered <- els %>% 
+  filter(!is.na(FirstGen))
+
+ggplot(els_filtered, aes(x = factor(FirstGen), fill = factor(FirstGen))) +
+  geom_bar() +
+    geom_text(stat = 'count', aes(label = ..count..), position = position_stack(vjust = 0.5), color = "white") +
+  scale_x_discrete(labels = c("0" = "Non-First Generation", "1" = "First Generation")) +
+  labs(title = "Distribution of First Generation College Students", x = "Category", y = "Count") +
+  scale_fill_manual(values = c("0" = "skyblue", "1" = "darkseagreen3"), labels = c("Non-First Generation", "First Generation")) +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+
+```
+
+```{r with 1}
+#| title: First Generation and Excellent Test Scores
+els$excellentTests <- as.numeric(els$excellentTests)
+ggplot(els, aes(x = factor(FirstGen), y = excellentTests, fill = factor(FirstGen))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Excellent Test Scores by First Generation Status in ELS", x = "First Generation Status", y = "Excellent Test Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+```
+
+```{r with 2}
+#| title: First Generation and Master Skills Scores
+els$masterSkills <- as.numeric(els$masterSkills)
+ggplot(els, aes(x = factor(FirstGen), y = masterSkills, fill = factor(FirstGen))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Master Skills Scores by First Generation Status in ELS", x = "First Generation Status", y = "Master Skills Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+```
+
+```{r with 3}
+#| title: First Generation and Understand Texts Scores
+els$understandTexts <- as.numeric(els$understandTexts)
+ggplot(els, aes(x = factor(FirstGen), y = understandTexts, fill = factor(FirstGen))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Understand Texts Scores by First Generation Status in ELS", x = "First Generation Status", y = "Understand Texts Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+
+```
+
+```{r with 4}
+#| title: First Generation and Understand Class Scores
+els$understandClass <- as.numeric(els$understandClass)
+ggplot(els, aes(x = factor(FirstGen), y = understandClass, fill = factor(FirstGen))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Understand Class Scores by First Generation Status in ELS", x = "First Generation Status", y = "Understand Class Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+
+```
+
+```{r with 5}
+#| title: First Generation and Excellent Assignment Scores
+els$excellentAssign <- as.numeric(els$excellentAssign)
+ggplot(els, aes(x = factor(FirstGen), y = excellentAssign, fill = factor(FirstGen))) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Pastel1") +
+  labs(title = "Excellent Assignment Scores by First Generation Status in ELS", x = "First Generation Status", y = "Excellent Assignment Scores") +
+  theme_minimal()+
+  guides(fill = guide_legend(title = "FirstGen"))
+
+```
+
+
+# HSLS
+## Row {height=40%}
+### Column {.tabset width="70%"}
+
+```{r bar1}
+#| title: Excellent Tests
+hsls_clean_excellentTests <- hsls[!is.na(hsls$excellentTests), ]
+
+mean_excellentTests_hsls <- mean(hsls_clean_excellentTests$excellentTests, na.rm = TRUE)
+median_excellentTests_hsls <- median(hsls_clean_excellentTests$excellentTests, na.rm = TRUE)
+
+# bar graph
+ggplot(hsls_clean_excellentTests, aes(x = as.factor(excellentTests))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Excellent Test Scores (HSLS)", 
+       x = "Excellent Test Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_excellentTests_hsls, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_excellentTests_hsls), hjust = 1.1, vjust = 1, size = 4, color = "black")
+
+```
+
+```{r bar2}
+#| title: Master Skilss
+hsls_clean_masterSkills <- hsls[!is.na(hsls$masterSkills), ]
+
+mean_masterSkills_hsls <- mean(hsls_clean_masterSkills$masterSkills, na.rm = TRUE)
+median_masterSkills_hsls <- median(hsls_clean_masterSkills$masterSkills, na.rm = TRUE)
+
+ggplot(hsls_clean_masterSkills, aes(x = as.factor(masterSkills))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Mastering Skills Scores (HSLS)", 
+       x = "Mastering Skills Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_masterSkills_hsls, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_masterSkills_hsls), hjust = 1.1, vjust = 1, size = 4, color = "black")
+```
+
+```{r bar3}
+#| title: Understand Texts
+hsls_clean_understandTexts <- hsls[!is.na(hsls$understandTexts), ]
+
+mean_understandTexts_hsls <- mean(hsls_clean_understandTexts$understandTexts, na.rm = TRUE)
+median_understandTexts_hsls <- median(hsls_clean_understandTexts$understandTexts, na.rm = TRUE)
+
+ggplot(hsls_clean_understandTexts, aes(x = as.factor(understandTexts))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Understanding Texts Scores (HSLS)", 
+       x = "Understanding Texts Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_understandTexts_hsls, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_understandTexts_hsls), hjust = 1.1, vjust = 1, size = 4, color = "black")
+
+```
+
+```{r bar4}
+#| title: Excellent Assignment
+hsls_clean_excellentAssign <- hsls %>%
+  filter(!is.na(excellentAssign))
+
+mean_excellentAssign <- mean(hsls_clean_excellentAssign$excellentAssign, na.rm = TRUE)
+median_excellentAssign <- median(hsls_clean_excellentAssign$excellentAssign, na.rm = TRUE)
+
+ggplot(hsls_clean_excellentAssign, aes(x = as.factor(excellentAssign))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never(1)", `2` = "Sometimes(2)", `3` = "Often(3)", `4` = "Almost Always(4)")) +
+  labs(title = "Bar Graph: Excellent Assignment Scores (HSLS)", 
+       x = "Excellent Assignment Scores", 
+       y = "Count") +
+  geom_text(aes(label = ..count..), stat = 'count', position = position_stack(vjust = 0.5), color = "white") +
+  annotate("text", x = Inf, y = Inf, label = paste("Mean:", round(mean_excellentAssign, 2)), hjust = 1.1, vjust = 2, size = 4, color = "black") +
+  annotate("text", x = Inf, y = Inf, label = paste("Median:", median_excellentAssign), hjust = 1.1, vjust = 1, size = 4, color = "black") 
+
+```
+
+```{r stacked bar}
+#| title: Stacked Bar Graph
+hsls_long <- hsls %>%
+  pivot_longer(
+    cols = c(excellentTests, understandTexts, masterSkills, excellentAssign),
+    names_to = "ScoreType",
+    values_to = "Scores"
+  ) %>%
+  filter(!is.na(Scores)) 
+
+ggplot(hsls_long, aes(x = ScoreType, fill = as.factor(Scores))) + 
+  geom_bar(position = "stack") + 
+  geom_text(stat = 'count', aes(label = ..count..), position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Frequency of Scores by Score Type (HSLS)", 
+    x = "Score Type", 
+    y = "Frequency"
+  ) +
+  scale_fill_brewer(palette = "Set4", labels = c("1" = "Almost Never(1)", "2" = "Sometimes(2)", "3" = "Often(3)", "4" = "Almost Always(4)")) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 6)) +
+  theme(axis.text.x = element_text(size = 4.5))+
+  guides(fill = guide_legend(title = "Scores"))
+  
+```
+
+
+### Column
+
+```{r eth distribution2}
+#| title: ethnicity distribution
+ethnicity_counts <- hsls %>%
+  summarise(Hispanic = sum(Hispanic, na.rm = TRUE),
+            White = sum(White, na.rm = TRUE),
+            Black = sum(Black, na.rm = TRUE),
+            Asian = sum(Asian, na.rm = TRUE),
+            PacificIsland = sum(PacificIsland, na.rm = TRUE)) %>%
+  pivot_longer(cols = everything(), names_to = "Ethnicity", values_to = "Counts")
+
+# Calculate percentages for each ethnicity
+ethnicity_counts <- ethnicity_counts %>%
+  mutate(Percentage = Counts / sum(Counts) * 100)
+
+hsls_eth<-ggplot(ethnicity_counts, aes(x = "", y = Percentage, fill = Ethnicity)) +
+  geom_bar(width = 1, stat = "identity", color = "white") +
+  coord_polar("y", start = 0) +
+  geom_text(aes(label = paste(Ethnicity, sprintf("%.1f%%", Percentage))), position = position_stack(vjust = 0.5)) +
+  labs(title = "Ethnicity Distribution (HSLS)", x = NULL, y = NULL) +
+  scale_fill_brewer(palette = "Pastel1") +
+  theme_void()
+print(hsls_eth)
+```
+
+
+
+## Row
+### Column{.tabset width="70%"}
+
+```{r by gender}
+#| title: Ratings Grouped by Gender
+hsls_long <- hsls %>%
+  pivot_longer(cols = c("excellentTests", "understandTexts", "masterSkills", "excellentAssign"), 
+               names_to = "Test", values_to = "Score") %>%
+  mutate(sex = factor(sex, levels = c(1, 2), labels = c("Male", "Female"))) 
+
+colors_male <- brewer.pal(4, "Blues") 
+colors_female <- brewer.pal(4, "Reds")  
+hsls_long <- hsls_long %>%
+  mutate(ColorKey = interaction(sex, Score))
+color_values <- setNames(c(colors_male, colors_female), 
+                         levels(hsls_long$ColorKey))
+hsls_long_filtered <- hsls_long %>%
+  filter(!is.na(Score))
+
+labels_corrected <- c(
+  "Male: Almost Never(1)", "Female: Almost Never(1)",
+  "Male: Sometimes(2)", "Female: Sometimes(2)",
+  "Male: Often(3)", "Female: Often(3)",
+  "Male: Almost Always(4)", "Female: Almost Always(4)"
+)
+
+ggplot(hsls_long_filtered, aes(x = Test, fill = ColorKey)) + 
+  geom_bar(position = position_dodge(width = 0.9), stat = "count") +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count", 
+    position = position_dodge(width = 0.9), 
+    vjust = -0.25,
+    size = 2.5
+  ) +
+  scale_fill_manual(values = color_values, name = "Sex & Score") +
+  labs(
+    title = "Frequency of Scores by Test and Gender (HSLS)",
+    x = "Test", y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r by ethnicity}
+#| title: Ratings Grouped by Ethnicity
+hsls_long <- hsls %>%
+  pivot_longer(cols = c(Asian, Black, Hispanic, PacificIsland, White), names_to = "ethnicity", values_to = "belongs") %>%
+  filter(belongs == 1) %>%
+  select(-belongs) %>%
+  pivot_longer(cols = c(excellentTests, understandTexts, masterSkills, excellentAssign),
+               names_to = "Test", values_to = "Score") %>%
+  mutate(Score = factor(Score)) %>%
+  filter(!is.na(Score), !is.na(ethnicity))
+
+color_values_hsls <- setNames(c(
+  "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",  # Asian
+  "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22",  # Black
+  "#17becf", "#9edae5", "#c5b0d5", "#aec7e8",  # Hispanic
+  "#ffbb78", "#c49c94", "#f7b6d2", "#c7c7c7",  # PacificIsland
+  "#dbdb8d", "#98df8a", "#ff9896", "#c5b0d5"   # White
+), c(
+  "Asian_1", "Asian_2", "Asian_3", "Asian_4",
+  "Black_1", "Black_2", "Black_3", "Black_4",
+  "Hispanic_1", "Hispanic_2", "Hispanic_3", "Hispanic_4",
+  "PacificIsland_1", "PacificIsland_2", "PacificIsland_3", "PacificIsland_4",
+  "White_1", "White_2", "White_3", "White_4"
+))
+ggplot(hsls_long, aes(x = Test, fill = interaction(ethnicity, Score))) + 
+  geom_bar(stat = "count", position = position_dodge(width = 0.9)) +
+  scale_fill_manual(values = color_values_hsls) +
+  labs(title = "Frequency of Scores by Test and Ethnicity (HSLS)",
+       x = "Test", y = "Frequency") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+### Column
+
+```{r gender disribution2}
+#| title: Gender Distribution
+hsls_summary <- hsls %>%
+  filter(!is.na(sex)) %>%  
+  count(sex) %>%
+  mutate(
+    Percentage = n / sum(n) * 100,
+    Label = paste0(round(Percentage, 1), "%"),
+    sex = factor(sex, levels = c(1, 2), labels = c("Female", "Male")) 
+  )
+
+hsls_gender<-ggplot(hsls_summary, aes(x = "", y = n, fill = sex)) + 
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = Label, y = cumsum(n) - 0.5 * n), position = position_stack(vjust = 0.5)) +
+  scale_fill_manual(values = c("Female" = "lightskyblue2", "Male" = "mintcream")) +
+  labs(title = "Gender Distribution (HSLS)", x = NULL, y = NULL, fill = "Gender") +
+  theme_void()
+print(hsls_gender)
+```
+
+
+# DataComparison
+## Row {height=40%}
+### Column {.tabset width="70%"}
+
+```{r compare1}
+#| title: Excellent Tests
+p_els_excellentTests <- ggplot(els[!is.na(els$excellentTests), ], aes(x = as.factor(excellentTests))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "ELS: Excellent Test Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+p_hsls_excellentTests <- ggplot(hsls[!is.na(hsls$excellentTests), ], aes(x = as.factor(excellentTests))) + 
+  geom_bar(fill = "skyblue", color = "skyblue") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "HSLS: Excellent Test Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+p_els_excellentTests + p_hsls_excellentTests
+```
+
+```{r comp2}
+#| title: Excellent Assignment
+# ELS: Excellent Assignment
+p_els_excellentAssign <- ggplot(els[!is.na(els$excellentAssign), ], aes(x = as.factor(excellentAssign))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "ELS: Excellent Assignment Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+# HSLS: Excellent Assignment
+p_hsls_excellentAssign <- ggplot(hsls[!is.na(hsls$excellentAssign), ], aes(x = as.factor(excellentAssign))) + 
+  geom_bar(fill = "skyblue", color = "skyblue") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "HSLS: Excellent Assignment Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+p_els_excellentAssign + p_hsls_excellentAssign
+```
+
+```{r comp3}
+#| title: Master Skills
+# ELS: Master Skills
+p_els_masterSkills <- ggplot(els[!is.na(els$masterSkills), ], aes(x = as.factor(masterSkills))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "ELS: Mastering Skills Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+# HSLS: Master Skills
+p_hsls_masterSkills <- ggplot(hsls[!is.na(hsls$masterSkills), ], aes(x = as.factor(masterSkills))) + 
+  geom_bar(fill = "skyblue", color = "skyblue") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "HSLS: Mastering Skills Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+p_els_masterSkills + p_hsls_masterSkills
+```
+
+```{r comp4}
+#| title: Understand Texts
+# ELS: Understand Texts
+p_els_understandTexts <- ggplot(els[!is.na(els$understandTexts), ], aes(x = as.factor(understandTexts))) + 
+  geom_bar(fill = "darkseagreen3", color = "darkseagreen3") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "ELS: Understanding Texts Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+# HSLS: Understand Texts
+p_hsls_understandTexts <- ggplot(hsls[!is.na(hsls$understandTexts), ], aes(x = as.factor(understandTexts))) + 
+  geom_bar(fill = "skyblue", color = "skyblue") +
+  scale_x_discrete(labels = c(`1` = "Almost Never", `2` = "Sometimes", `3` = "Often", `4` = "Almost Always")) +
+  labs(title = "HSLS: Understanding Texts Scores", x = "Scores", y = "Count") +
+  theme_minimal()
+
+p_els_understandTexts + p_hsls_understandTexts
+
+```
+
+### Column
+
+```{r gender+eth comp}
+
+els_gender+hsls_gender
+els_eth+hsls_eth
+```
